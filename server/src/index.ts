@@ -3,6 +3,11 @@ import express from 'express'
 import cors from 'cors'
 import authRoutes from './routes/auth.js'
 import projectRoutes from './routes/projects.js'
+import epicRoutes from './routes/epics.js'
+import featureRoutes from './routes/features.js'
+import storyRoutes from './routes/stories.js'
+import taskRoutes from './routes/tasks.js'
+import resourceTypeRoutes from './routes/resourceTypes.js'
 
 const app = express()
 const PORT = process.env.PORT ?? 3001
@@ -13,5 +18,11 @@ app.use(express.json())
 app.get('/health', (_req, res) => res.json({ status: 'ok' }))
 app.use('/api/auth', authRoutes)
 app.use('/api/projects', projectRoutes)
+app.use('/api/projects/:projectId/epics', epicRoutes)
+app.use('/api/projects/:projectId/resource-types', resourceTypeRoutes)
+app.use('/api/epics/:epicId/features', featureRoutes)
+app.use('/api/features/:featureId/stories', storyRoutes)
+app.use('/api/stories/:storyId/tasks', taskRoutes)
 
+export { app }
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`))

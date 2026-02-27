@@ -65,7 +65,7 @@ export default function BacklogPage() {
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm text-gray-500">
-            <button onClick={() => navigate('/')} className="hover:text-red-600 transition-colors font-semibold text-gray-900">Westpac Estimator</button>
+            <button onClick={() => navigate('/')} className="hover:text-red-600 transition-colors font-semibold text-gray-900">Monrad Estimator</button>
             <span>/</span>
             <button onClick={() => navigate(`/projects/${projectId}`)} className="hover:text-red-600 transition-colors">{project?.name ?? '…'}</button>
             <span>/</span>

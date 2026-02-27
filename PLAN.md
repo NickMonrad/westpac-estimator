@@ -1,4 +1,4 @@
-# Westpac Estimator — Implementation Plan
+# Monrad Estimator — Implementation Plan
 
 ## Problem
 Replace a spreadsheet-based estimation process with a structured web application that manages project backlogs, resource profiling, scheduling, and generates customer-facing documents.

@@ -51,9 +51,9 @@ export default function ProjectsPage() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
-              <span className="text-white text-xs font-bold">W</span>
+              <span className="text-white text-xs font-bold">M</span>
             </div>
-            <span className="font-semibold text-gray-900">Westpac Estimator</span>
+            <span className="font-semibold text-gray-900">Monrad Estimator</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-500">{user?.name}</span>

@@ -70,8 +70,13 @@ export default function FeatureList({ epicId, features, resourceTypes, projectId
               <span className="text-xs text-blue-500 bg-blue-100 px-1.5 py-0.5 rounded">Feature</span>
               <span className="text-sm text-gray-800 flex-1 truncate">{feature.name}</span>
               <span className="text-xs text-gray-400">{feature.userStories.length} stor{feature.userStories.length !== 1 ? 'ies' : 'y'} · {totalHours(feature)}h</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); setApplyTemplateFeatureId(feature.id) }}
+                className="text-xs font-medium text-purple-700 bg-purple-100 hover:bg-purple-200 px-2 py-0.5 rounded-full transition-colors"
+              >
+                + Template
+              </button>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                <button onClick={() => setApplyTemplateFeatureId(feature.id)} className="text-xs text-purple-400 hover:text-purple-600 px-1">Template</button>
                 <button onClick={() => setEditingId(feature.id)} className="text-xs text-gray-400 hover:text-gray-700 px-1">Edit</button>
                 <button onClick={() => deleteFeature.mutate(feature.id)} className="text-xs text-red-400 hover:text-red-600 px-1">Delete</button>
               </div>

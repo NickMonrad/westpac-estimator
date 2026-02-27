@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
+import BacklogPage from './pages/BacklogPage'
 
 const queryClient = new QueryClient()
 
@@ -25,6 +26,7 @@ function AppRoutes() {
       <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
       <Route path="/" element={<PrivateRoute><ProjectsPage /></PrivateRoute>} />
       <Route path="/projects/:id" element={<PrivateRoute><ProjectDetailPage /></PrivateRoute>} />
+      <Route path="/projects/:id/backlog" element={<PrivateRoute><BacklogPage /></PrivateRoute>} />
     </Routes>
   )
 }
@@ -40,3 +42,4 @@ export default function App() {
     </QueryClientProvider>
   )
 }
+

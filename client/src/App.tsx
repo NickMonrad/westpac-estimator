@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage'
 import ProjectsPage from './pages/ProjectsPage'
 import ProjectDetailPage from './pages/ProjectDetailPage'
 import BacklogPage from './pages/BacklogPage'
+import TemplateLibraryPage from './pages/TemplateLibraryPage'
 
 const queryClient = new QueryClient()
 
@@ -27,6 +28,7 @@ function AppRoutes() {
       <Route path="/" element={<PrivateRoute><ProjectsPage /></PrivateRoute>} />
       <Route path="/projects/:id" element={<PrivateRoute><ProjectDetailPage /></PrivateRoute>} />
       <Route path="/projects/:id/backlog" element={<PrivateRoute><BacklogPage /></PrivateRoute>} />
+      <Route path="/templates" element={<PrivateRoute><TemplateLibraryPage /></PrivateRoute>} />
     </Routes>
   )
 }

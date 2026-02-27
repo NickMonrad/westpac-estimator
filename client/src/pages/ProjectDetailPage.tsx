@@ -30,6 +30,7 @@ export default function ProjectDetailPage() {
     { label: 'Timeline', href: `/projects/${id}/timeline`, icon: '📅', desc: 'Plan and schedule work' },
     { label: 'Resource Profile', href: `/projects/${id}/resources`, icon: '👥', desc: 'Engineering and overlay profile' },
     { label: 'Documents', href: `/projects/${id}/documents`, icon: '📄', desc: 'Generate scope doc and SOW' },
+    { label: 'Template Library', href: `/templates`, icon: '🧩', desc: 'Browse and manage feature templates' },
   ]
 
   return (

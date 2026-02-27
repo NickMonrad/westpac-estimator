@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../lib/api'
 import type { Feature, ResourceType } from '../../types/backlog'
 import StoryList from './StoryList'
+import ApplyTemplateModal from './ApplyTemplateModal'
 
 interface Props {
   epicId: string
@@ -17,6 +18,7 @@ export default function FeatureList({ epicId, features, resourceTypes, projectId
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ name: '', description: '', assumptions: '' })
+  const [applyTemplateFeatureId, setApplyTemplateFeatureId] = useState<string | null>(null)
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ['backlog', projectId] })
 
@@ -44,6 +46,13 @@ export default function FeatureList({ epicId, features, resourceTypes, projectId
 
   return (
     <div className="ml-4 mt-1 space-y-1">
+      {applyTemplateFeatureId && (
+        <ApplyTemplateModal
+          featureId={applyTemplateFeatureId}
+          projectId={projectId}
+          onClose={() => setApplyTemplateFeatureId(null)}
+        />
+      )}
       {features.map(feature => (
         <div key={feature.id}>
           {editingId === feature.id ? (
@@ -62,6 +71,7 @@ export default function FeatureList({ epicId, features, resourceTypes, projectId
               <span className="text-sm text-gray-800 flex-1 truncate">{feature.name}</span>
               <span className="text-xs text-gray-400">{feature.userStories.length} stor{feature.userStories.length !== 1 ? 'ies' : 'y'} · {totalHours(feature)}h</span>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setApplyTemplateFeatureId(feature.id)} className="text-xs text-purple-400 hover:text-purple-600 px-1">Template</button>
                 <button onClick={() => setEditingId(feature.id)} className="text-xs text-gray-400 hover:text-gray-700 px-1">Edit</button>
                 <button onClick={() => deleteFeature.mutate(feature.id)} className="text-xs text-red-400 hover:text-red-600 px-1">Delete</button>
               </div>

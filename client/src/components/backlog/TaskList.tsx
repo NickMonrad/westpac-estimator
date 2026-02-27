@@ -10,7 +10,7 @@ interface Props {
   projectId: string
 }
 
-const HOURS_PER_DAY = 8
+const HOURS_PER_DAY = 7.6
 
 export default function TaskList({ storyId, tasks, resourceTypes, projectId }: Props) {
   const qc = useQueryClient()
@@ -98,18 +98,45 @@ function TaskForm({ initial, resourceTypes, onSave, onCancel, saving }: {
   saving: boolean
 }) {
   const [form, setForm] = useState(initial)
+  const [days, setDays] = useState(
+    initial.hoursEffort && parseFloat(initial.hoursEffort) > 0
+      ? String(parseFloat((parseFloat(initial.hoursEffort) / HOURS_PER_DAY).toFixed(2)))
+      : ''
+  )
+
   const f = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
     setForm(v => ({ ...v, [field]: e.target.value }))
+
+  const onHoursChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const h = e.target.value
+    setForm(v => ({ ...v, hoursEffort: h }))
+    const parsed = parseFloat(h)
+    setDays(!isNaN(parsed) && parsed > 0 ? String(parseFloat((parsed / HOURS_PER_DAY).toFixed(2))) : '')
+  }
+
+  const onDaysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const d = e.target.value
+    setDays(d)
+    const parsed = parseFloat(d)
+    setForm(v => ({ ...v, hoursEffort: !isNaN(parsed) && parsed > 0 ? String(parseFloat((parsed * HOURS_PER_DAY).toFixed(2))) : '' }))
+  }
 
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 gap-2">
         <input placeholder="Task name *" value={form.name} onChange={f('name')} className="col-span-2 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
-        <select value={form.resourceTypeId} onChange={f('resourceTypeId')} className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400">
+        <select value={form.resourceTypeId} onChange={f('resourceTypeId')} className="col-span-2 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400">
           <option value="">Resource type *</option>
           {resourceTypes.map(rt => <option key={rt.id} value={rt.id}>{rt.name}</option>)}
         </select>
-        <input type="number" placeholder="Hours effort" min="0" step="0.5" value={form.hoursEffort} onChange={f('hoursEffort')} className="border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+        <div>
+          <label className="block text-xs text-gray-500 mb-0.5">Hours</label>
+          <input type="number" placeholder="0" min="0" step="0.5" value={form.hoursEffort} onChange={onHoursChange} className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-500 mb-0.5">Days (@ {HOURS_PER_DAY}h)</label>
+          <input type="number" placeholder="0" min="0" step="0.1" value={days} onChange={onDaysChange} className="w-full border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
+        </div>
         <textarea placeholder="Description" value={form.description} onChange={f('description')} rows={1} className="col-span-2 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
         <textarea placeholder="Assumptions" value={form.assumptions} onChange={f('assumptions')} rows={1} className="col-span-2 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" />
       </div>

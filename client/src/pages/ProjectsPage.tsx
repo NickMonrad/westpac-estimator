@@ -28,6 +28,7 @@ export default function ProjectsPage() {
   const queryClient = useQueryClient()
   const [showNew, setShowNew] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', customer: '' })
+  const [search, setSearch] = useState('')
 
   const { data: projects = [], isLoading } = useQuery<Project[]>({
     queryKey: ['projects'],
@@ -64,12 +65,21 @@ export default function ProjectsPage() {
       <main className="max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-semibold text-gray-900">Projects</h1>
-          <button
-            onClick={() => setShowNew(true)}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
-          >
-            + New project
-          </button>
+          <div className="flex items-center gap-3">
+            <input
+              type="text"
+              placeholder="Search projects…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-56 focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            <button
+              onClick={() => setShowNew(true)}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+            >
+              + New project
+            </button>
+          </div>
         </div>
 
         {/* New project form */}
@@ -126,7 +136,9 @@ export default function ProjectsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {projects.map(project => (
+            {projects
+              .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+              .map(project => (
               <div
                 key={project.id}
                 onClick={() => navigate(`/projects/${project.id}`)}

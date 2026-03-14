@@ -2,13 +2,10 @@ import { Router, Response } from 'express'
 import { OverheadType } from '@prisma/client'
 import { prisma } from '../lib/prisma.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { ownedProject } from '../lib/ownership.js'
 
 const router = Router({ mergeParams: true })
 router.use(authenticate)
-
-async function ownedProject(projectId: string, userId: string) {
-  return prisma.project.findFirst({ where: { id: projectId, ownerId: userId } })
-}
 
 function isValidOverheadType(value: unknown): value is OverheadType {
   return value === 'PERCENTAGE' || value === 'FIXED_DAYS' || value === 'DAYS_PER_WEEK'

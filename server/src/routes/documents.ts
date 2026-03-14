@@ -1,8 +1,11 @@
 import { Router, Response } from 'express'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
 import { prisma } from '../lib/prisma.js'
+import { ownedProject } from '../lib/ownership.js'
+import { ALLOWED_DOC_FORMATS, MAX_UPLOAD_SIZE_BYTES } from '../lib/constants.js'
 import path from 'path'
-import fs from 'fs'
+import { promises as fs } from 'fs'
+import { existsSync } from 'fs'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -10,10 +13,6 @@ const GENERATED_DIR = path.join(__dirname, '../../uploads/generated')
 
 const router = Router({ mergeParams: true })
 router.use(authenticate)
-
-async function ownedProject(projectId: string, userId: string) {
-  return prisma.project.findFirst({ where: { id: projectId, ownerId: userId } })
-}
 
 // POST /api/projects/:projectId/documents/generate
 // Body: { type: 'SCOPE_DOC', format: 'pdf', label: string, sections: string[], pdfBase64: string }
@@ -29,13 +28,23 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
     res.status(400).json({ error: 'type, format, label and pdfBase64 are required' }); return
   }
 
+  if (!(ALLOWED_DOC_FORMATS as readonly string[]).includes(format)) {
+    res.status(400).json({ error: `format must be one of: ${ALLOWED_DOC_FORMATS.join(', ')}` }); return
+  }
+
+  // Validate file size before decoding
+  const estimatedSize = Math.ceil(pdfBase64.length * 0.75)
+  if (estimatedSize > MAX_UPLOAD_SIZE_BYTES) {
+    res.status(400).json({ error: 'File too large (max 50 MB)' }); return
+  }
+
   // Ensure output directory exists
-  fs.mkdirSync(GENERATED_DIR, { recursive: true })
+  await fs.mkdir(GENERATED_DIR, { recursive: true })
 
   const filename = `${projectId}-${Date.now()}.${format}`
   const filePath = path.join(GENERATED_DIR, filename)
   const buffer = Buffer.from(pdfBase64, 'base64')
-  fs.writeFileSync(filePath, buffer)
+  await fs.writeFile(filePath, buffer)
 
   const doc = await prisma.generatedDocument.create({
     data: {
@@ -77,7 +86,7 @@ router.get('/:docId/download', async (req: AuthRequest, res: Response) => {
   if (!doc) { res.status(404).json({ error: 'Document not found' }); return }
 
   const filePath = path.join(GENERATED_DIR, doc.filePath)
-  if (!fs.existsSync(filePath)) { res.status(404).json({ error: 'File not found on disk' }); return }
+  if (!existsSync(filePath)) { res.status(404).json({ error: 'File not found on disk' }); return }
 
   const contentTypes: Record<string, string> = {
     pdf: 'application/pdf',
@@ -101,7 +110,11 @@ router.delete('/:docId', async (req: AuthRequest, res: Response) => {
 
   // Delete file from disk
   const filePath = path.join(GENERATED_DIR, doc.filePath)
-  if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+  try {
+    await fs.unlink(filePath)
+  } catch {
+    // File may already be deleted — ignore
+  }
 
   await prisma.generatedDocument.delete({ where: { id: doc.id } })
   res.json({ success: true })

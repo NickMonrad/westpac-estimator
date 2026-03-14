@@ -1,13 +1,10 @@
 import { Router, Response } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { ownedProject } from '../lib/ownership.js'
 
 const router = Router({ mergeParams: true })
 router.use(authenticate)
-
-async function ownedProject(projectId: string, userId: string) {
-  return prisma.project.findFirst({ where: { id: projectId, ownerId: userId } })
-}
 
 // GET /api/projects/:projectId/feature-dependencies
 router.get('/', async (req: AuthRequest, res: Response) => {
@@ -48,8 +45,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       },
     })
     res.status(201).json(dep)
-  } catch (e: any) {
-    if (e.code === 'P2002') {
+  } catch (e: unknown) {
+    if (e instanceof Error && 'code' in e && (e as any).code === 'P2002') {
       res.status(409).json({ error: 'Dependency already exists' }); return
     }
     throw e

@@ -1,16 +1,11 @@
 import { Router, Response } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { ownedProject } from '../lib/ownership.js'
+import { VALID_DISCOUNT_TYPES } from '../lib/constants.js'
 
 const router = Router({ mergeParams: true })
 router.use(authenticate)
-
-// Verify project ownership helper
-async function ownedProject(projectId: string, userId: string) {
-  return prisma.project.findFirst({ where: { id: projectId, ownerId: userId } })
-}
-
-const VALID_DISCOUNT_TYPES = ['PERCENTAGE', 'FIXED_AMOUNT']
 
 // GET /projects/:projectId/discounts
 router.get('/', async (req: AuthRequest, res: Response) => {
@@ -31,7 +26,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
   const { type, value, label, resourceTypeId, order } = req.body
   if (!label) { res.status(400).json({ error: 'label is required' }); return }
-  if (!VALID_DISCOUNT_TYPES.includes(type)) {
+  if (!(VALID_DISCOUNT_TYPES as readonly string[]).includes(type)) {
     res.status(400).json({ error: 'type must be PERCENTAGE or FIXED_AMOUNT' }); return
   }
   if (typeof value !== 'number' || value <= 0) {
@@ -73,7 +68,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
   const { type, value, label, resourceTypeId, order } = req.body
 
-  if (type !== undefined && !VALID_DISCOUNT_TYPES.includes(type)) {
+  if (type !== undefined && !(VALID_DISCOUNT_TYPES as readonly string[]).includes(type)) {
     res.status(400).json({ error: 'type must be PERCENTAGE or FIXED_AMOUNT' }); return
   }
   if (value !== undefined && (typeof value !== 'number' || value <= 0)) {

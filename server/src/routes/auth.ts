@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken'
 import crypto from 'crypto'
 import { prisma } from '../lib/prisma.js'
 import { sendEmail } from '../lib/email.js'
+import { JWT_EXPIRY, PASSWORD_RESET_EXPIRY_MS } from '../lib/constants.js'
 
 const router = Router()
 
@@ -20,7 +21,7 @@ router.post('/register', async (req: Request, res: Response) => {
   }
   const hashed = await bcrypt.hash(password, 10)
   const user = await prisma.user.create({ data: { email, name, password: hashed } })
-  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, { expiresIn: '7d' })
+  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, { expiresIn: JWT_EXPIRY })
   res.status(201).json({ token, user: { id: user.id, email: user.email, name: user.name } })
 })
 
@@ -31,7 +32,7 @@ router.post('/login', async (req: Request, res: Response) => {
     res.status(401).json({ error: 'Invalid credentials' })
     return
   }
-  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, { expiresIn: '7d' })
+  const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, { expiresIn: JWT_EXPIRY })
   res.json({ token, user: { id: user.id, email: user.email, name: user.name } })
 })
 
@@ -47,7 +48,7 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 
   const token = crypto.randomBytes(32).toString('hex')
   const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+  const expiresAt = new Date(Date.now() + PASSWORD_RESET_EXPIRY_MS) // 1 hour
 
   // Delete any existing unused tokens for this user
   await prisma.passwordResetToken.deleteMany({

@@ -1,6 +1,7 @@
 import { Router, Response } from 'express'
 import { prisma } from '../lib/prisma.js'
 import { authenticate, AuthRequest } from '../middleware/auth.js'
+import { DEFAULT_HOURS_PER_DAY } from '../lib/constants.js'
 
 const router = Router()
 router.use(authenticate)
@@ -309,7 +310,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       name,
       description,
       status: status ?? 'DRAFT',
-      hoursPerDay: hoursPerDay ?? 7.6,
+      hoursPerDay: hoursPerDay ?? DEFAULT_HOURS_PER_DAY,
       bufferWeeks: bufferWeeks ?? 0,
       customerId,
       orgId,
@@ -363,9 +364,9 @@ router.post('/:id/move-to-org', async (req: AuthRequest, res: Response) => {
     const project = await prisma.project.update({
       where: { id },
       data: { orgId: orgId || null },
-    include: { org: { select: { id: true, name: true } } },
-  })
-  res.json(project)
+      include: { org: { select: { id: true, name: true } } },
+    })
+    res.json(project)
   } catch (err) {
     console.error('POST /projects/:id/move-to-org error:', err)
     res.status(500).json({ error: 'Failed to update project org' })

@@ -61,5 +61,13 @@ app.use('/api/projects/:projectId/documents', documentRoutes)
 app.use('/api/orgs', authenticate, orgRoutes)
 app.use('/api/customers', authenticate, customerRoutes)
 
+// Global error handler — catches unhandled errors in route handlers
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled error:', err)
+  if (!res.headersSent) {
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
 export { app }
 app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`))

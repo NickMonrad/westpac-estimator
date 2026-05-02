@@ -6,9 +6,13 @@ import {
   runScheduler,
   getWeeklyCapacity,
   computeParallelWarnings,
+  type SchedulerInput,
   type SchedulerResourceType,
   type ParallelWarning,
 } from '../lib/scheduler.js'
+import { runSAPlanner } from '../lib/sa-planner.js'
+import { buildSnapshot } from './snapshots.js'
+import { pruneSnapshots } from '../lib/snapshotUtils.js'
 
 const router = Router({ mergeParams: true })
 router.use(authenticate)
@@ -154,11 +158,16 @@ function buildResponse(
   // Build weekly capacity array for EVERY week (0..maxWeek-1) for RTs that have hours
   const rtNamesWithHours = new Set(weeklyDemand.map(d => d.resourceTypeName))
   const weeklyCapacity: { week: number; resourceTypeName: string; capacityDays: number }[] = []
-  if (maxWeek != null) {
+  // Ensure capacity covers at least as far as the maximum demand week
+  const maxDemandWeek = weeklyDemand.length > 0
+    ? Math.max(...weeklyDemand.map(d => d.week))
+    : 0
+  const capacityEndWeek = Math.max(maxWeek != null ? Math.ceil(maxWeek) : 0, maxDemandWeek + 1)
+  if (capacityEndWeek > 0) {
     for (const rt of resourceTypes) {
       if (!rtNamesWithHours.has(rt.name)) continue
       const hpd = rt.hoursPerDay ?? project.hoursPerDay
-      for (let w = 0; w < Math.ceil(maxWeek); w++) {
+      for (let w = 0; w < capacityEndWeek; w++) {
         const capDays = getWeeklyCapacity(rt, w, project.hoursPerDay) / hpd
         weeklyCapacity.push({ week: w, resourceTypeName: rt.name, capacityDays: Math.round(capDays * 10) / 10 })
       }
@@ -694,6 +703,171 @@ router.get('/export/csv', asyncHandler(async (req: AuthRequest, res: Response) =
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
   res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
   res.send(csv)
+}))
+
+// POST /api/projects/:projectId/timeline/level
+// Must be registered BEFORE /:featureId to avoid param capture.
+router.post('/level', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const projectId = req.params.projectId as string
+  const project = await ownedProject(projectId, req.userId!)
+  if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+
+  const { dryRun } = req.body as { dryRun?: boolean }
+
+  // ── 1. Load scheduler input (same pattern as POST /schedule) ─────────────
+  const [allEpics, resourceTypes, manualFeatures, manualStories, epicDeps] = await Promise.all([
+    prisma.epic.findMany({
+      where: { projectId },
+      orderBy: { order: 'asc' },
+      include: {
+        features: {
+          orderBy: { order: 'asc' },
+          include: {
+            userStories: {
+              orderBy: { order: 'asc' },
+              include: {
+                tasks: { include: { resourceType: true } },
+                dependencies: true,
+              },
+            },
+            dependencies: true,
+          },
+        },
+      },
+    }),
+    prisma.resourceType.findMany({ where: { projectId }, include: { namedResources: true } }),
+    prisma.timelineEntry.findMany({ where: { projectId, isManual: true } }),
+    prisma.storyTimelineEntry.findMany({ where: { projectId, isManual: true } }),
+    prisma.epicDependency.findMany({
+      where: { epic: { projectId } },
+      select: { epicId: true, dependsOnId: true },
+    }),
+  ])
+
+  const activeEpics = allEpics
+    .filter(e => e.isActive !== false)
+    .map(e => ({ ...e, features: e.features.filter(f => f.isActive !== false) }))
+
+  const schedulerInput: SchedulerInput = {
+    project: { hoursPerDay: project.hoursPerDay },
+    epics: activeEpics,
+    resourceTypes: resourceTypes as SchedulerResourceType[],
+    epicDeps,
+    manualFeatureEntries: manualFeatures.map(e => ({
+      featureId: e.featureId,
+      startWeek: e.startWeek,
+      durationWeeks: e.durationWeeks,
+    })),
+    manualStoryEntries: manualStories.map(e => ({
+      storyId: e.storyId,
+      startWeek: e.startWeek,
+    })),
+    resourceLevel: false,
+  }
+
+  // ── 2. Run the SA planner for optimised levelling ──────────────────────────
+  const saResult = runSAPlanner(schedulerInput, {
+    targetDurationWeeks: schedulerInput.epics.length * 13,
+    maxParallelismPerFeature: 2,
+  })
+  const levellingResult = {
+    epicStartWeeks: saResult.epicStartWeeks,
+    featureStartWeeks: saResult.featureStartWeeks,
+    totalDeliveryWeeks: saResult.totalDeliveryWeeks,
+    peakUtilisationPct: saResult.peakUtilisationPct,
+  }
+
+  if (dryRun) {
+    res.json({
+      epicStartWeeks: Object.fromEntries(levellingResult.epicStartWeeks),
+      featureStartWeeks: Object.fromEntries(levellingResult.featureStartWeeks),
+      totalDeliveryWeeks: levellingResult.totalDeliveryWeeks,
+      peakUtilisationPct: levellingResult.peakUtilisationPct,
+    })
+    return
+  }
+
+  // ── 3. Persist: snapshot → update Epic.timelineStartWeek → re-materialise ─
+  const snapshotData = await buildSnapshot(projectId)
+  const dateStr = new Date().toISOString().slice(0, 10)
+  const snap = await prisma.backlogSnapshot.create({
+    data: {
+      projectId,
+      label: `Auto-saved before resource levelling — ${dateStr}`,
+      trigger: 'level_resources',
+      snapshot: snapshotData as unknown as object,
+      createdById: req.userId!,
+    },
+    select: { id: true },
+  })
+  await pruneSnapshots(prisma, projectId)
+
+  // Update Epic.timelineStartWeek for each epic
+  await Promise.all(
+    Array.from(levellingResult.epicStartWeeks.entries()).map(([epicId, startWeek]) =>
+      prisma.epic.update({ where: { id: epicId }, data: { timelineStartWeek: startWeek } })
+    )
+  )
+
+  // Update Feature.timelineStartWeek for each feature
+  await Promise.all(
+    Array.from(levellingResult.featureStartWeeks.entries()).map(([featureId, startWeek]) =>
+      prisma.feature.update({ where: { id: featureId }, data: { timelineStartWeek: startWeek } })
+    )
+  )
+
+  // Re-run scheduler with updated start weeks and materialise timeline
+  const updatedEpics = activeEpics.map(e => ({
+    ...e,
+    timelineStartWeek: levellingResult.epicStartWeeks.get(e.id) ?? e.timelineStartWeek,
+    features: e.features.map(f => ({
+      ...f,
+      timelineStartWeek: levellingResult.featureStartWeeks.get(f.id) ?? f.timelineStartWeek ?? null,
+    })),
+  }))
+
+  const { featureSchedule, storySchedule } = runScheduler({
+    ...schedulerInput,
+    epics: updatedEpics,
+  })
+
+  await prisma.$transaction(async tx => {
+    await tx.timelineEntry.deleteMany({ where: { projectId, isManual: false } })
+    const featureRows = featureSchedule
+      .filter(e => !e.isManual)
+      .map(e => ({
+        projectId,
+        featureId: e.featureId,
+        startWeek: e.startWeek,
+        durationWeeks: e.durationWeeks,
+        isManual: false,
+      }))
+    if (featureRows.length > 0) {
+      await tx.timelineEntry.createMany({ data: featureRows, skipDuplicates: true })
+    }
+
+    await tx.storyTimelineEntry.deleteMany({ where: { projectId, isManual: false } })
+    const storyRows = storySchedule
+      .filter(e => !e.isManual)
+      .map(e => ({
+        projectId,
+        storyId: e.storyId,
+        startWeek: e.startWeek,
+        durationWeeks: e.durationWeeks,
+        isManual: false,
+      }))
+    if (storyRows.length > 0) {
+      await tx.storyTimelineEntry.createMany({ data: storyRows, skipDuplicates: true })
+    }
+  })
+
+  res.json({
+    epicStartWeeks: Object.fromEntries(levellingResult.epicStartWeeks),
+    featureStartWeeks: Object.fromEntries(levellingResult.featureStartWeeks),
+    snapshotId: snap.id,
+    totalDeliveryWeeks: levellingResult.totalDeliveryWeeks,
+    peakUtilisationPct: levellingResult.peakUtilisationPct,
+  })
 }))
 
 // PUT /api/projects/:projectId/timeline/:featureId
